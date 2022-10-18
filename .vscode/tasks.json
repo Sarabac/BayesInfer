@@ -1,0 +1,28 @@
+{
+  // See https://go.microsoft.com/fwlink/?LinkId=733558
+  // for the documentation about the tasks.json format
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Database Rebuild",
+      "type": "shell",
+      "command": "docker-compose.exe -f ./docker/docker-compose.yml down; docker-compose.exe -f ./docker/docker-compose.yml up -d",
+      "group": "none",
+      "problemMatcher": [],
+    },
+    {
+      "label": "Database Fill",
+      "type": "shell",
+      "command": "cd ./src; npx sequelize-cli db:migrate; npx sequelize db:seed:all",
+      "group": "none",
+      "problemMatcher": [],
+    },
+    {
+      "label": "Database Rebuild & Fill",
+      "type": "shell",
+      "command": "docker-compose.exe -f ./docker/docker-compose.yml down; docker-compose.exe -f ./docker/docker-compose.yml up -d; cd ./src; npx sequelize-cli db:migrate; npx sequelize db:seed:all",
+      "group": "none",
+      "problemMatcher": [],
+    },
+  ]
+}
