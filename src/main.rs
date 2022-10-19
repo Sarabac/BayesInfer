@@ -1,29 +1,50 @@
-use std::fs;
+use rust_db::database::{clear, connect, add_hypo, add_record, read_all, read_model, build_model};
+use serde::{Deserialize, Serialize};
 
-use postgres::{Client, Error, NoTls};
+use postgres::Error;
 
 const DATABASE_URL: &str = "postgresql://spatial:pass@localhost:5243/geopython";
 const INIT_FILE: &str = "src/init.sql";
 
+#[derive(Serialize, Deserialize, Debug)]
+struct BinomTest {
+    p: f64,
+}
+#[derive(Serialize, Deserialize, Debug)]
+struct Genre {
+    f: i8,
+}
+
+fn init_binom(bin: &BinomTest) -> f64{
+  bin.p
+}
+
+fn model(bin: &BinomTest, genre: &Genre) -> f64 {
+  bin.p * (genre.f as f64)
+}
+
 fn main() -> Result<(), Error> {
-    println!("connect");
-    let mut client = Client::connect(DATABASE_URL, NoTls)?;
-    println!("open init file");
-    let init_file = fs::read_to_string(INIT_FILE).expect("no init file");
-    println!("init table");
-    client.batch_execute(&init_file)?;
+    let mut client = connect(DATABASE_URL, INIT_FILE)?;
+    println!("clear database");
+    
+    print!("create hypo");
+    let iter_binom = (1..100).map(|n| BinomTest {
+        p: 1f64 / (n as f64),
+    });
+    println!("create genre");
+    let iter_genre = vec![Genre{f:0}, Genre{f:1}];
 
-    client.execute("INSERT INTO hypo(json_serial) VALUES($1)", &[&"test"])?;
+    println!("add hypo");
+    add_hypo(&mut client, iter_binom)?;
+    println!("add genre");
+    add_record(&mut client, iter_genre)?;
+    println!("read all");
+    read_all(&mut client)?;
 
-
-    let query = client.query("SELECT * FROM hypo", &[])?;
-    for row in query {
-      let id: i32 = row.get(0);
-      let seri: &str = row.get(1);
-      println!("voici: {}:{}", id, seri);
-        
-    }
+    println!("add model");
+    build_model(&mut client, model)?;
+    println!("read model");
+    read_model(&mut client)?;
 
     Ok(())
-    
 }
