@@ -1,7 +1,8 @@
-use rust_db::database::{clear, connect, add_hypo, add_record, read_all, read_model, build_model};
+use rust_db::database::{add_hypo, add_record, build_model, clear, connect, read_all, read_model};
 use serde::{Deserialize, Serialize};
 
 use postgres::Error;
+use sqlx::{pool, postgres::PgPoolOptions};
 
 const DATABASE_URL: &str = "postgresql://spatial:pass@localhost:5243/geopython";
 const INIT_FILE: &str = "src/init.sql";
@@ -15,36 +16,36 @@ struct Genre {
     f: i8,
 }
 
-fn init_binom(bin: &BinomTest) -> f64{
-  bin.p
+fn init_binom(bin: &BinomTest) -> f64 {
+    bin.p
 }
 
 fn model(bin: &BinomTest, genre: &Genre) -> f64 {
-  bin.p * (genre.f as f64)
+    bin.p * (genre.f as f64)
 }
 
-fn main() -> Result<(), Error> {
-    let mut client = connect(DATABASE_URL, INIT_FILE)?;
+//#[async_std::main]
+#[tokio::main]
+// #[actix_web::main]
+async fn main() -> Result<(), sqlx::Error> {
+    let client = connect(DATABASE_URL, INIT_FILE).await?;
     println!("clear database");
-    
     print!("create hypo");
     let iter_binom = (1..100).map(|n| BinomTest {
         p: 1f64 / (n as f64),
     });
     println!("create genre");
-    let iter_genre = vec![Genre{f:0}, Genre{f:1}];
+    let iter_genre = vec![Genre { f: 0 }, Genre { f: 1 }];
 
     println!("add hypo");
-    add_hypo(&mut client, iter_binom)?;
+    add_hypo(&client, iter_binom).await?;
     println!("add genre");
-    add_record(&mut client, iter_genre)?;
+    add_record(&client, iter_genre).await?;
     println!("read all");
-    read_all(&mut client)?;
-
+    println!("{}", read_all(&client).await);
     println!("add model");
-    build_model(&mut client, model)?;
+    build_model(&client, model).await;
     println!("read model");
-    read_model(&mut client)?;
-
+    //read_model(&client)?;
     Ok(())
 }
