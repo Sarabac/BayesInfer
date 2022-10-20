@@ -1,4 +1,4 @@
-use rust_db::database::{add_hypo, add_record, build_model, clear, connect, read_all, read_model};
+use rust_db::database::{add_hypo, add_record, build_model, clear, connect, read_all, read_model, init_prior};
 use serde::{Deserialize, Serialize};
 
 use postgres::Error;
@@ -49,5 +49,11 @@ async fn main() -> Result<(), sqlx::Error> {
     println!("read model");
     let string_model = read_model(&client).await;
     println!("{}", string_model);
+    println!("init prior");
+    init_prior(&client, |h: &BinomTest| h.p).await;
+
+
     Ok(())
+
+
 }

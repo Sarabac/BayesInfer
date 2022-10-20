@@ -59,27 +59,33 @@ where
     .await
 }
 
-pub fn init_prior<H, F>(client: &mut Client, func: F) -> Result<u64, Error>
+pub async fn init_prior<H, F>(client: &PgPool, func: F) -> usize
 where
     H: DeserializeOwned,
     F: Fn(&H) -> f64,
 {
-    let hypos = client.query("SELECT id, json_serial FROM hypo", &[])?;
-    let zero: u32 = 0;
-    let mut nb: u64 = 0;
-    for row in hypos {
-        let id: i32 = row.get(0);
-        let json_serial: &str = row.get(1);
-        let hypo: H = serde_json::from_str(&json_serial).unwrap();
-        let proba: f64 = func(&hypo);
-        nb += client.execute(
-            "INSERT INTO likelihood(hypo_id, iter, proba) VALUES($1, $2, $3)",
-            &[&id, &zero, &proba],
-        )?;
-    }
-    Ok(nb)
+    sqlx::query("SELECT id, json_serial FROM hypo")
+        .fetch(client)
+        .map(|row| {
+            let r = row.ok()?;
+            let id: i32 = r.try_get(0).ok()?;
+            let json_serial: &str = r.try_get(1).ok()?;
+            let hypo: H = serde_json::from_str(&json_serial).ok()?;
+            let proba: f64 = func(&hypo);
+            return Some((id, proba));
+        })
+        .then(|row| async move {
+            let r = row?;
+            return sqlx::query("INSERT INTO likelihood(hypo_id, iter, proba) VALUES($1, 0, $2)")
+                .bind(r.0)
+                .bind(r.1)
+                .execute(client)
+                .await
+                .ok();
+        })
+        .count()
+        .await
 }
-
 pub async fn build_model<H, R, F>(client: &PgPool, func: F) -> u64
 where
     H: DeserializeOwned,
