@@ -44,8 +44,10 @@ async fn main() -> Result<(), sqlx::Error> {
     println!("read all");
     println!("{}", read_all(&client).await);
     println!("add model");
-    build_model(&client, model).await;
+    let nb_model = build_model(&client, model).await;
+    println!("{}", nb_model);
     println!("read model");
-    //read_model(&client)?;
+    let string_model = read_model(&client).await;
+    println!("{}", string_model);
     Ok(())
 }

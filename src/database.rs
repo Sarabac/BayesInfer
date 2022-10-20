@@ -129,16 +129,22 @@ pub async fn read_all(client: &PgPool) -> String {
         .join("\n")
 }
 
-pub fn read_model(client: &mut Client) -> Result<u64, Error> {
-    let query = client.query("SELECT * FROM model", &[])?;
-    for row in query {
-        let id: i32 = row.get(0);
-        let id_h: i32 = row.get(1);
-        let id_r: i32 = row.get(2);
-        let proba: f64 = row.get(3);
-        println!("{}[{}, {}]: {}", id, id_h, id_r, proba);
-    }
-    Ok(0u64)
+pub async fn read_model(client: &PgPool) -> String {
+    sqlx::query("SELECT * FROM model")
+        .fetch(client)
+        .filter_map(|row| async move {
+            if let Ok(r) = row {
+                let id: i32 = r.try_get(0).ok()?;
+                let id_h: i32 = r.try_get(1).ok()?;
+                let id_r: i32 = r.try_get(2).ok()?;
+                let proba: f64 = r.try_get(3).ok()?;
+                return Some(format!("{}[{}, {}]: {}", id, id_h, id_r, proba));
+            }
+            return None;
+        })
+        .collect::<Vec<String>>()
+        .await
+        .join("\n")
 }
 pub async fn clear(client: &PgPool) -> Result<(), sqlx::Error> {
     sqlx::query(
