@@ -1,6 +1,6 @@
 use std::{borrow::Borrow, fs, result};
 
-use futures::{Future, StreamExt, TryStreamExt};
+use futures::{StreamExt};
 use postgres::{Client, Error};
 use serde::{de::DeserializeOwned, Serialize};
 use sqlx::{

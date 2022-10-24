@@ -1,4 +1,9 @@
-use rust_db::database::{add_hypo, add_record, build_model, clear, connect, read_all, read_model, init_prior};
+use rust_db::{
+    database::{
+        add_hypo, add_record, build_model, clear, connect, init_prior, read_all, read_model,
+    },
+    test_type::BayesModel,
+};
 use serde::{Deserialize, Serialize};
 
 use postgres::Error;
@@ -20,7 +25,7 @@ fn init_binom(bin: &BinomTest) -> f64 {
     bin.p
 }
 
-fn model(bin: &BinomTest, genre: &Genre) -> f64 {
+fn model_binom(bin: &BinomTest, genre: &Genre) -> f64 {
     bin.p * (genre.f as f64)
 }
 
@@ -28,8 +33,6 @@ fn model(bin: &BinomTest, genre: &Genre) -> f64 {
 #[tokio::main]
 // #[actix_web::main]
 async fn main() -> Result<(), sqlx::Error> {
-    let client = connect(DATABASE_URL, INIT_FILE).await?;
-    println!("clear database");
     print!("create hypo");
     let iter_binom = (1..100).map(|n| BinomTest {
         p: 1f64 / (n as f64),
@@ -37,23 +40,23 @@ async fn main() -> Result<(), sqlx::Error> {
     println!("create genre");
     let iter_genre = vec![Genre { f: 0 }, Genre { f: 1 }];
 
-    println!("add hypo");
-    add_hypo(&client, iter_binom).await?;
-    println!("add genre");
-    add_record(&client, iter_genre).await?;
-    println!("read all");
-    println!("{}", read_all(&client).await);
-    println!("add model");
-    let nb_model = build_model(&client, model).await;
-    println!("{}", nb_model);
-    println!("read model");
-    let string_model = read_model(&client).await;
-    println!("{}", string_model);
-    println!("init prior");
-    init_prior(&client, |h: &BinomTest| h.p).await;
+    println!("create model");
+    let model: BayesModel<BinomTest, Genre> = BayesModel::connect(DATABASE_URL).await;
 
+    println!("add hypo");
+    model.add_hypo(iter_binom).await?;
+    println!("add genre");
+    model.add_record(iter_genre).await?;
+    println!("read all");
+    println!("{:?}", model.get_hypo().await);
+    println!("add model");
+    let nb_model = model.add_model_fn(model_binom).await;
+    println!("{:?}", nb_model);
+    println!("read model");
+    //let string_model = read_model(&client).await;
+    //println!("{}", string_model);
+    println!("init prior"); 
+    //init_prior(&client, |h: &BinomTest| h.p).await;
 
     Ok(())
-
-
 }
