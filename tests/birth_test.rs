@@ -19,7 +19,7 @@ fn model_binom(bin: &BinomTest, genre: &Genre) -> f64 {
     bin.p * (genre.f as f64)
 }
 
-#[sqlx::test]
+#[sqlx::test(migrations = false)]
 async fn birth(conn: PgPool) -> sqlx::Result<()> {
     
     let iter_binom = (1..10).map(|n| BinomTest {
@@ -31,15 +31,16 @@ async fn birth(conn: PgPool) -> sqlx::Result<()> {
     
     let model: BayesModel<BinomTest, Genre> = BayesModel::connect(conn).await;
 
+    println!("add hypo");
     model.add_hypo(iter_binom).await?;
     model.add_record(iter_genre).await?;
 
     let test_get_hypo = model.get_hypo().await;
-    assert!(test_get_hypo.len() == 9);
+    assert_eq!(test_get_hypo.len(), 9);
     let nb_model = model.add_model_fn(model_binom).await;
-    assert!(nb_model.0 == 9 * 2 && nb_model.1 == 0);
+    assert_eq!(nb_model.0, 9 * 2);
     let vec_model = model.get_model_all().await;
-    assert!(vec_model.len() == 9 * 2);
+    assert_eq!(vec_model.len(), 9 * 2);
 
     //let string_model = read_model(&client).await;
     //println!("{}", string_model);

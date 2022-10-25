@@ -1,10 +1,9 @@
-use std::{borrow::Borrow, collections::HashMap, fs, marker::PhantomData};
+use std::{borrow::Borrow, collections::HashMap, marker::PhantomData};
 
 use futures::{future::join_all, FutureExt, StreamExt};
 use serde::{de::DeserializeOwned, Serialize};
 use sqlx::{PgPool, Row};
 
-const INIT_FILE: &str = "src/init.sql";
 pub struct BayesModel<H: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned> {
     conn: PgPool,
     hypo: PhantomData<H>,
@@ -27,21 +26,17 @@ impl<H: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned> BayesMode
     }
 
     pub async fn init(&self) {
-        let init = fs::read_to_string(INIT_FILE).expect("no init file");
-        sqlx::query(&init).execute_many(&self.conn).await;
+        sqlx::migrate!()
+            .run(&self.conn)
+            .await
+            .expect("init database");
     }
 
     pub async fn clear(&self) {
-        sqlx::query(
-            "
-        DROP TABLE IF EXISTS model CASCADE;
-        DROP TABLE IF EXISTS  likelihood CASCADE;
-        DROP TABLE IF EXISTS  hypo CASCADE;
-        DROP TABLE IF EXISTS  record CASCADE;
-        ",
-        )
-        .execute_many(&self.conn)
-        .await;
+        sqlx::migrate!()
+            .undo(&self.conn, 0)
+            .await
+            .expect("clear doesnt work");
     }
 
     async fn add<T, I>(&self, hypos: I, request: &str) -> Result<u64, sqlx::Error>

@@ -1,0 +1,5 @@
+-- Add down migration script here
+DROP TABLE IF EXISTS model CASCADE;
+DROP TABLE IF EXISTS likelihood CASCADE;
+DROP TABLE IF EXISTS hypo CASCADE;
+DROP TABLE IF EXISTS record CASCADE;
