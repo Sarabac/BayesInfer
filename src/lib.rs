@@ -1,2 +1,2 @@
-pub mod database;
-pub mod test_type;
+
+pub mod bayes_model;

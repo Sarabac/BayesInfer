@@ -1,16 +1,11 @@
 use rust_db::{
-    database::{
-        add_hypo, add_record, build_model, clear, connect, init_prior, read_all, read_model,
-    },
-    test_type::BayesModel,
+    bayes_model::BayesModel,
 };
 use serde::{Deserialize, Serialize};
 
-use postgres::Error;
-use sqlx::{pool, postgres::PgPoolOptions};
+use sqlx::PgPool;
 
 const DATABASE_URL: &str = "postgresql://spatial:pass@localhost:5243/geopython";
-const INIT_FILE: &str = "src/init.sql";
 
 #[derive(Serialize, Deserialize, Debug)]
 struct BinomTest {
@@ -33,6 +28,11 @@ fn model_binom(bin: &BinomTest, genre: &Genre) -> f64 {
 #[tokio::main]
 // #[actix_web::main]
 async fn main() -> Result<(), sqlx::Error> {
+    let conn = PgPool::connect(DATABASE_URL)
+            .await
+            .expect("can not connect");
+
+
     print!("create hypo");
     let iter_binom = (1..100).map(|n| BinomTest {
         p: 1f64 / (n as f64),
@@ -41,7 +41,7 @@ async fn main() -> Result<(), sqlx::Error> {
     let iter_genre = vec![Genre { f: 0 }, Genre { f: 1 }];
 
     println!("create model");
-    let model: BayesModel<BinomTest, Genre> = BayesModel::connect(DATABASE_URL).await;
+    let model: BayesModel<BinomTest, Genre> = BayesModel::connect(conn).await;
 
     println!("add hypo");
     model.add_hypo(iter_binom).await?;
@@ -53,6 +53,8 @@ async fn main() -> Result<(), sqlx::Error> {
     let nb_model = model.add_model_fn(model_binom).await;
     println!("{:?}", nb_model);
     println!("read model");
+    let vec_model = model.get_model_all().await;
+    println!("{:?}", vec_model);
     //let string_model = read_model(&client).await;
     //println!("{}", string_model);
     println!("init prior"); 

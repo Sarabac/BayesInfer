@@ -1,15 +1,8 @@
-use std::{borrow::Borrow, collections::HashMap, fs, marker::PhantomData, result};
+use std::{borrow::Borrow, collections::HashMap, fs, marker::PhantomData};
 
-use futures::{
-    future::{join_all, try_join_all},
-    join, FutureExt, StreamExt, TryFutureExt,
-};
+use futures::{future::join_all, FutureExt, StreamExt};
 use serde::{de::DeserializeOwned, Serialize};
-use sqlx::{
-    postgres::{PgPoolOptions, PgQueryResult, PgRow},
-    query::Query,
-    Connection, Executor, PgConnection, PgPool, Pool, Postgres, Row,
-};
+use sqlx::{PgPool, Row};
 
 const INIT_FILE: &str = "src/init.sql";
 pub struct BayesModel<H: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned> {
@@ -19,21 +12,18 @@ pub struct BayesModel<H: Serialize + DeserializeOwned, R: Serialize + Deserializ
 }
 
 impl<H: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned> BayesModel<H, R> {
-    pub async fn connect(database_url: &str) -> BayesModel<H, R> {
+    pub async fn connect(conn: PgPool) -> BayesModel<H, R> {
         println!("connect");
-        let conn = PgPool::connect(database_url)
-            .await
-            .expect("can not connect");
-        let result = BayesModel {
+        let bayes_model = BayesModel {
             conn,
             hypo: PhantomData::<H>,
             record: PhantomData::<R>,
         };
         println!("clear");
-        result.clear().await;
+        bayes_model.clear().await;
         println!("init");
-        result.init().await;
-        result
+        bayes_model.init().await;
+        return bayes_model;
     }
 
     pub async fn init(&self) {
@@ -233,6 +223,29 @@ impl<H: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned> BayesMode
                 Err(_) => (acc.0, acc.1 + 1),
             }
         })
+        .await
+    }
+
+    pub async fn get_model_all(&self) -> Vec<(H, R, f64)> {
+        sqlx::query(
+            r"
+        SELECT h.json_serial AS hypo_serial, r.json_serial AS record_serial, m.proba AS proba 
+        FROM model m 
+        INNER JOIN hypo h ON h.id = m.hypo_id 
+        INNER JOIN record r ON r.id = m.record_id",
+        )
+        .fetch(&self.conn)
+        .map(|row| {
+            let r = row.ok()?;
+            let hypo_serial: String = r.try_get(0).ok()?;
+            let record_serial: String = r.try_get(1).ok()?;
+            let proba: f64 = r.try_get(2).ok()?;
+            let hypo: H = serde_json::from_str(&hypo_serial).ok()?;
+            let record: R = serde_json::from_str(&record_serial).ok()?;
+            return Some((hypo, record, proba));
+        })
+        .filter_map(|row| async move { row })
+        .collect()
         .await
     }
 }
