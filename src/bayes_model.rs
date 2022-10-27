@@ -244,3 +244,15 @@ impl<H: Serialize + DeserializeOwned, R: Serialize + DeserializeOwned> BayesMode
         .await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use  super::*;
+
+    #[test]
+    fn essaie(){
+        let o = 4;
+        assert_eq!(o, 4);
+    }
+
+}

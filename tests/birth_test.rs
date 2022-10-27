@@ -16,19 +16,20 @@ fn init_binom(bin: &BinomTest) -> f64 {
 }
 
 fn model_binom(bin: &BinomTest, genre: &Genre) -> f64 {
-    bin.p * (genre.f as f64)
+    match genre.f {
+        1 => bin.p,
+        _ => 1f64 - bin.p,
+    }
 }
 
 #[sqlx::test(migrations = false)]
 async fn birth(conn: PgPool) -> sqlx::Result<()> {
-    
-    let iter_binom = (1..10).map(|n| BinomTest {
+    let iter_binom = (2..11).map(|n| BinomTest {
         p: 1f64 / (n as f64),
     });
-    
+
     let iter_genre = vec![Genre { f: 0 }, Genre { f: 1 }];
 
-    
     let model: BayesModel<BinomTest, Genre> = BayesModel::connect(conn).await;
 
     println!("add hypo");
@@ -36,9 +37,14 @@ async fn birth(conn: PgPool) -> sqlx::Result<()> {
     model.add_record(iter_genre).await?;
 
     let test_get_hypo = model.get_hypo().await;
-    assert_eq!(test_get_hypo.len(), 9);
+    assert_eq!(test_get_hypo.len(), 9, "nb hypo");
     let nb_model = model.add_model_fn(model_binom).await;
-    assert_eq!(nb_model.0, 9 * 2);
+    println!("{:?}", nb_model);
+    let all_model = model.get_model_all().await;
+    let all_record = model.get_record().await;
+    println!("{:?}", all_model);
+    println!("{:?}", all_record);
+    assert_eq!(nb_model.0, 9 * 2, "model size");
     let vec_model = model.get_model_all().await;
     assert_eq!(vec_model.len(), 9 * 2);
 
